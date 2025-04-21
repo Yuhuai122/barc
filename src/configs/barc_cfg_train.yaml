@@ -10,8 +10,8 @@ optim:
   GAMMA: 0.1
   MOMENTUM: 0
   WEIGHT_DECAY: 0
-  EPOCHS: 220
-  BATCH_SIZE: 12       # keep 12 (needs to be an even number, as we have a custom data sampler)
+  EPOCHS: 50
+  BATCH_SIZE: 8       # keep 12 (needs to be an even number, as we have a custom data sampler)
   TRAIN_PARTS: 'all_without_shapedirs'
 
 data:

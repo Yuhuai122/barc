@@ -24,6 +24,8 @@ class Loss(torch.nn.Module):
         self.l_anchor = None
         self.l_pos = None
         self.l_neg = None
+        self.criterion_smoothl1 = torch.nn.SmoothL1Loss()  # 新增：平滑L1损失
+
 
         if nf_version is not None:
             self.normalizing_flow_pose_prior = NormalizingFlowPrior(nf_version=nf_version)
@@ -79,8 +81,15 @@ class Loss(torch.nn.Module):
         target_kp_resh = (target_dict['tpts'][:, :, :2] / 64. * (256. - 1)).reshape((-1, 2))
         weights_resh = target_dict['tpts'][:, :, 2].reshape((-1)) 
         keyp_w_resh = self.keypoint_weights.repeat((batch_size, 1)).reshape((-1))
+        #loss_keyp = ((((output_kp_resh - target_kp_resh)[weights_resh>0]**2).sum(axis=1).sqrt()*weights_resh[weights_resh>0])*keyp_w_resh[weights_resh>0]).sum() / \
+        #    max((weights_resh[weights_resh>0]*keyp_w_resh[weights_resh>0]).sum(), 1e-5)
         loss_keyp = ((((output_kp_resh - target_kp_resh)[weights_resh>0]**2).sum(axis=1).sqrt()*weights_resh[weights_resh>0])*keyp_w_resh[weights_resh>0]).sum() / \
             max((weights_resh[weights_resh>0]*keyp_w_resh[weights_resh>0]).sum(), 1e-5)
+        # 新增：Smooth L1 损失项
+        mask = weights_resh > 0
+        output_kp_masked = output_kp_resh[mask]
+        target_kp_masked = target_kp_resh[mask]
+        smoothl1_loss_keyp = self.criterion_smoothl1(output_kp_masked, target_kp_masked)
 
         # loss on reprojected silhouette
         assert output_reproj['silh'].shape == (target_dict['silh'][:, None, :, :]).shape
@@ -238,7 +247,9 @@ class Loss(torch.nn.Module):
             loss_partseg = torch.zeros((1)).mean()
 
         # weight and combine losses
-        loss_keyp_weighted = loss_keyp * weight_dict['keyp']
+        #loss_keyp_weighted = loss_keyp * weight_dict['keyp']
+        # 修改：加入平滑L1加权损失
+        loss_keyp_weighted = (loss_keyp + 0.1 * smoothl1_loss_keyp) * weight_dict['keyp']  # 其中0.1为平滑L1的相对权重，可调
         loss_silh_weighted = loss_silh * weight_dict['silh']
         loss_shapedirs_weighted = loss_shapedirs * weight_dict['shapedirs']
         loss_pose_weighted = loss_pose * weight_dict['pose_0']
@@ -271,7 +282,6 @@ class Loss(torch.nn.Module):
                     'loss_poselegssidemovement_weighted': loss_poselegssidemovement_weighted.item()}
                     
         return loss, loss_dict
-
 
 
 
