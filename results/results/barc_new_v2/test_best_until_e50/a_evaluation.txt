@@ -1,0 +1,6 @@
+iou:         68.46
+pck:         70.40
+pck_legs:    70.32
+pck_tail:    52.96
+pck_ears:    68.79
+pck_face:    81.38
